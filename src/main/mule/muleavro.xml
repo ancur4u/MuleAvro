@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:xml-module="http://www.mulesoft.org/schema/mule/xml-module" xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/xml-module http://www.mulesoft.org/schema/mule/xml-module/current/mule-xml-module.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="f77f71e0-cc5a-4957-ba53-314435f6e5c8" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<xml-module:config name="XML_Config" doc:name="XML Config" doc:id="07ca7eb5-0cc1-4135-833a-8c3c09da7ab1" expandEntities="ALL" />
+	<flow name="Deserializer" doc:id="fcd48327-641b-4450-9462-5551ab2f1cdf" >
+		<file:listener doc:name="On New or Updated File" doc:id="13b31e27-abfe-4b7a-8b6b-378e54d69090" directory="Documents/mule-avro/input" moveToDirectory="Documents/mule-avro/backup" autoDelete="true" outputMimeType="application/avro">
+			<scheduling-strategy >
+				<fixed-frequency />
+			</scheduling-strategy>
+			<file:matcher filenamePattern="*.avro"/>
+		</file:listener>
+		<ee:transform doc:name="Transform Message" doc:id="7466441c-dbc7-4e66-b46f-5100d060c364" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.2
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="483b8429-7709-440d-a02f-0a5049aab8c7" message="#['Deserialized avro payload': payload]"/>
+		<file:write doc:name="Write" doc:id="6382f67c-b22a-4d48-b4d8-b9f5c65b5e1c" path="#['Documents/mule-avro/output/test.avro' ++ attributes.creationTime ++'.json']" />
+	</flow>
+	<flow name="Serializer" doc:id="884e7117-c23a-40f2-98b4-dba545b7889c" >
+		<http:listener doc:name="Listener" doc:id="41f96e04-3a0d-4ac4-bcb6-03735ca5723b" config-ref="HTTP_Listener_config" path="/write"/>
+		<ee:transform doc:name="Transform Message" doc:id="fc307cc9-0c39-4963-a4cf-a0d1b3acc89a" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.2
+output application/avro schemaUrl="employee.avro.json"
+---
+(0 to 5) map {
+	employeeId: $$,
+	firstname: "Ankur" ++ $$,
+	lastname: "Parashar",
+	address: "Sample address: Kentucky islands",
+	notes: "some more information",
+	test: "Free test"
+}
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="553ce80c-523b-442e-bdba-4afb893e797d" message="#['Avro payload': payload]"/>
+		<file:write doc:name="Write" doc:id="46e075bd-ecbc-4670-ad24-8f7bbd7b3f08" path="#['Documents/mule-avro/input/test' ++ now() as LocalDateTime ++ '.avro']"/>
+		<logger level="INFO" doc:name="Logger" doc:id="f4ecd26f-a532-4687-833b-db0549e01776" message="#['File generated']"/>
+	</flow>
+</mule>
